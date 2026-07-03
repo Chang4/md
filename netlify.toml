@@ -1,0 +1,15 @@
+[build]
+  # 1. 指定构建命令
+  # 逻辑：先安装依赖 -> 再进入 apps/web 执行特定的构建脚本
+  command = "pnpm install --frozen-lockfile && pnpm web build:h5-netlify"
+
+  # 2. 指定发布目录
+  # 逻辑：构建产物在 apps/web/dist，必须写全路径
+  publish = "apps/web/dist"
+
+# 设置重定向规则，确保 SPA 路由正常工作
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
