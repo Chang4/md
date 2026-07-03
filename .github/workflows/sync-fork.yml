@@ -10,6 +10,8 @@ on:
 jobs:
   sync:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       # 1. 检出你的 Fork 仓库代码（获取完整历史记录以便合并）
       - name: Checkout fork
