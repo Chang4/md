@@ -2,7 +2,7 @@
 import type {
   HeadingLevel,
   HeadingStyleType,
-  themeMap,
+  ThemeName,
 } from '@md/shared/configs'
 import type { Format } from 'vue-pick-colors'
 import { X } from '@lucide/vue'
@@ -34,59 +34,67 @@ const {
   isCiteStatus,
   isUseIndent,
   isUseJustify,
+  isCountStatus,
 } = storeToRefs(themeStore)
 
 const { scheduleEditorRefresh, editorRefresh } = useEditorRefresh()
 
-// 标题样式选择器状态
 const selectedHeadingLevel = ref<HeadingLevel>(`h2`)
 const selectedHeadingStyle = computed({
   get: () => themeStore.getHeadingStyle(selectedHeadingLevel.value),
   set: (val: HeadingStyleType) => {
     themeStore.setHeadingStyle(selectedHeadingLevel.value, val)
     if (val === `custom`) {
-      // 打开 CSS 编辑器并滚动到对应标题区域
       uiStore.isShowCssEditor = true
-      // 等待 CSS 编辑器打开后再滚动
       nextTick(() => {
         setTimeout(() => {
           cssEditorStore.scrollToHeading(selectedHeadingLevel.value)
         }, 100)
       })
     }
-    // 无论选择预设还是自定义，都立即应用主题，确保标题样式及时恢复/更新
+    // Apply theme immediately for preset or custom to restore heading styles
     themeStore.applyCurrentTheme()
     scheduleEditorRefresh()
   },
 })
 
+// reka-ui SelectValue caches textContent; re-render localized labels on locale change
+const selectedHeadingStyleLabel = computed(() =>
+  localizedStyleOptions.value.headingStyleOptions
+    .find(option => option.value === selectedHeadingStyle.value)
+    ?.label,
+)
+
 const { isMobile, isOpenRightSlider, isDark } = storeToRefs(uiStore)
 
-// Theme change handlers
-function themeChanged(newTheme: keyof typeof themeMap) {
+function themeChanged(newTheme: ThemeName) {
   themeStore.theme = newTheme
-  // 使用新主题系统
+
   themeStore.applyCurrentTheme()
   scheduleEditorRefresh()
 }
 
+function openThemeMarketplace() {
+  uiStore.openMarketplaceDialog({ tab: `theme`, view: `discover` })
+}
+
 function fontChanged(fonts: string) {
   themeStore.fontFamily = fonts
-  // 使用新主题系统
+
   themeStore.applyCurrentTheme()
   scheduleEditorRefresh()
 }
 
 function sizeChanged(size: string) {
   themeStore.fontSize = size
-  // 使用新主题系统
+
   themeStore.applyCurrentTheme()
   scheduleEditorRefresh()
 }
 
 function colorChanged(newColor: string) {
   themeStore.primaryColor = newColor
-  // 使用新主题系统
+
   themeStore.applyCurrentTheme()
   scheduleEditorRefresh()
 }
@@ -120,14 +128,14 @@ function citeStatusChanged() {
 
 function useIndentChanged() {
   themeStore.isUseIndent = !themeStore.isUseIndent
-  // 使用新主题系统
+
   themeStore.applyCurrentTheme()
   scheduleEditorRefresh()
 }
 
 function useJustifyChanged() {
   themeStore.isUseJustify = !themeStore.isUseJustify
-  // 使用新主题系统
+
   themeStore.applyCurrentTheme()
   scheduleEditorRefresh()
 }
@@ -157,6 +165,16 @@ function setUseJustify(checked: boolean) {
     useJustifyChanged()
 }
 
+function countStatusChanged() {
+  themeStore.isCountStatus = !themeStore.isCountStatus
+  editorRefresh()
+}
+
+function setCountStatus(checked: boolean) {
+  if (checked !== isCountStatus.value)
+    countStatusChanged()
+}
+
 function resetStyleConfirm() {
   confirmStore.confirm({
     title: t(`confirm.tip`),
@@ -171,18 +189,14 @@ function resetStyleConfirm() {
   })
 }
 
-// 控制是否启用动画
 const enableAnimation = ref(false)
 
-// 监听 RightSlider 开关状态变化
 watch(isOpenRightSlider, () => {
   if (isMobile.value) {
-    // 在移动端，用户操作时启用动画
     enableAnimation.value = true
   }
 })
 
-// 监听设备类型变化，重置动画状态
 watch(isMobile, () => {
   enableAnimation.value = false
 })
@@ -190,10 +204,14 @@ watch(isMobile, () => {
 const pickColorsContainer = useTemplateRef<HTMLElement | undefined>(`pickColorsContainer`)
 const format = ref<Format>(`rgb`)
 const formatOptions = ref<Format[]>([`rgb`, `hex`, `hsl`, `hsv`])
+
+// Show color swatch only when right sidebar is narrow
+const colorGridRef = useTemplateRef<HTMLElement | undefined>(`colorGridRef`)
+const { width: colorGridWidth } = useElementSize(colorGridRef)
+const isColorCompact = computed(() => colorGridWidth.value > 0 && colorGridWidth.value < 280)
 </script>
 
 <template>
-  <!-- 移动端遮罩层 -->
   <div
     v-if="isMobile && isOpenRightSlider"
     class="fixed inset-0 bg-black/50 z-40"
@@ -212,7 +230,6 @@ const formatOptions = ref<Format[]>([`rgb`, `hex`, `hsl`, `hsv`])
       class="h-full space-y-4 overflow-auto p-4"
       :class="{ 'pt-0': isMobile }"
     >
-      <!-- 移动端标题栏 -->
       <div v-if="isMobile" class="sticky top-0 z-10 -mx-4 mb-4 border-b bg-background px-4 pb-3 pt-[max(0.5rem,env(safe-area-inset-top,0px))]">
         <div aria-hidden="true" class="mx-auto mb-2 h-1 w-10 rounded-full bg-muted-foreground/25" />
         <div class="flex items-center justify-between">
@@ -232,12 +249,20 @@ const formatOptions = ref<Format[]>([`rgb`, `hex`, `hsl`, `hsv`])
         <div class="grid grid-cols-3 gap-2">
           <Button
             v-for="{ label, value } in localizedStyleOptions.themeOptions" :key="value" class="h-auto w-full px-1.5 py-2 text-xs whitespace-nowrap" variant="outline" :class="{
-              'border-primary ring-1 ring-primary/20 border-2': theme === value,
+              'bg-accent text-accent-foreground ring-1 ring-primary/20 border-primary': theme === value,
             }" @click="themeChanged(value)"
           >
             {{ label }}
           </Button>
         </div>
+        <Button
+          variant="ghost"
+          size="sm"
+          class="h-8 w-full justify-start px-1.5 text-xs text-muted-foreground"
+          @click="openThemeMarketplace"
+        >
+          {{ t('marketplace.exploreThemes') }}
+        </Button>
       </div>
       <div class="space-y-2">
         <h2 class="text-sm font-medium">
@@ -246,7 +271,7 @@ const formatOptions = ref<Format[]>([`rgb`, `hex`, `hsl`, `hsv`])
         <div class="grid grid-cols-3 gap-2">
           <Button
             v-for="{ label, value } in localizedStyleOptions.fontFamilyOptions" :key="value" variant="outline" class="h-auto w-full px-1.5 py-2 text-xs whitespace-nowrap"
-            :class="{ 'border-primary ring-1 ring-primary/20 border-2': fontFamily === value }" @click="fontChanged(value)"
+            :class="{ 'bg-accent text-accent-foreground ring-1 ring-primary/20 border-primary': fontFamily === value }" @click="fontChanged(value)"
           >
             {{ label }}
           </Button>
@@ -259,7 +284,7 @@ const formatOptions = ref<Format[]>([`rgb`, `hex`, `hsl`, `hsv`])
         <div class="grid grid-cols-5 gap-1.5">
           <Button
             v-for="{ label, value, desc } in localizedStyleOptions.fontSizeOptions" :key="value" variant="outline" class="h-auto w-full px-1 py-2 text-xs whitespace-nowrap" :title="desc" :class="{
-              'border-primary ring-1 ring-primary/20 border-2': fontSize === value,
+              'bg-accent text-accent-foreground ring-1 ring-primary/20 border-primary': fontSize === value,
             }" @click="sizeChanged(value)"
           >
             {{ label }}
@@ -270,18 +295,32 @@ const formatOptions = ref<Format[]>([`rgb`, `hex`, `hsl`, `hsv`])
         <h2 class="text-sm font-medium">
           {{ t('menu.primaryColor') }}
         </h2>
-        <div class="grid grid-cols-3 gap-2">
+        <div
+          ref="colorGridRef"
+          class="grid gap-2"
+          :class="isColorCompact ? 'grid-cols-4 sm:grid-cols-5' : 'grid-cols-3'"
+        >
           <Button
-            v-for="{ label, value } in localizedStyleOptions.colorOptions" :key="value" class="h-auto w-full px-1.5 py-2 text-xs whitespace-nowrap" variant="outline" :class="{
-              'border-primary ring-1 ring-primary/20 border-2': primaryColor === value,
-            }" @click="colorChanged(value)"
+            v-for="{ label, value } in localizedStyleOptions.colorOptions"
+            :key="value"
+            class="h-auto w-full text-xs whitespace-nowrap"
+            :class="[
+              isColorCompact ? 'justify-center px-1 py-2' : 'px-1.5 py-2',
+              {
+                'bg-accent text-accent-foreground ring-1 ring-primary/20 border-primary': primaryColor === value,
+              },
+            ]"
+            variant="outline"
+            :title="label"
+            :aria-label="label"
+            @click="colorChanged(value)"
           >
             <span
-              class="mr-1.5 inline-block size-3 shrink-0 rounded-full" :style="{
-                background: value,
-              }"
+              class="inline-block shrink-0 rounded-full"
+              :class="isColorCompact ? 'size-4' : 'mr-1.5 size-3'"
+              :style="{ background: value }"
             />
-            {{ label }}
+            <span v-if="!isColorCompact">{{ label }}</span>
           </Button>
         </div>
       </div>
@@ -314,7 +353,9 @@ const formatOptions = ref<Format[]>([`rgb`, `hex`, `hsl`, `hsv`])
           </Select>
           <Select v-model="selectedHeadingStyle">
             <SelectTrigger class="flex-1">
-              <SelectValue :placeholder="t('rightSlider.selectStyle')" />
+              <SelectValue :placeholder="t('rightSlider.selectStyle')">
+                {{ selectedHeadingStyleLabel }}
+              </SelectValue>
             </SelectTrigger>
             <SelectContent>
               <SelectItem v-for="{ label, value } in localizedStyleOptions.headingStyleOptions" :key="value" :value="value">
@@ -346,7 +387,7 @@ const formatOptions = ref<Format[]>([`rgb`, `hex`, `hsl`, `hsv`])
         <div class="grid grid-cols-2 gap-2">
           <Button
             v-for="{ label, value } in localizedStyleOptions.legendOptions" :key="value" class="h-auto w-full px-1.5 py-2 text-xs whitespace-nowrap" variant="outline" :class="{
-              'border-primary ring-1 ring-primary/20 border-2': legend === value,
+              'bg-accent text-accent-foreground ring-1 ring-primary/20 border-primary': legend === value,
             }" @click="legendChanged(value)"
           >
             {{ label }}
@@ -373,6 +414,10 @@ const formatOptions = ref<Format[]>([`rgb`, `hex`, `hsl`, `hsv`])
         <Label for="use-justify" class="min-w-0 shrink text-xs leading-snug sm:text-sm">{{ t('rightSlider.paragraphJustify') }}</Label>
         <Switch id="use-justify" class="shrink-0" :model-value="isUseJustify" @update:model-value="setUseJustify" />
       </div>
+      <div class="flex items-center justify-between gap-3">
+        <Label for="count-status" class="min-w-0 shrink text-xs leading-snug sm:text-sm">{{ t('rightSlider.wordCount') }}</Label>
+        <Switch id="count-status" class="shrink-0" :model-value="isCountStatus" @update:model-value="setCountStatus" />
+      </div>
       <div class="space-y-2">
         <h2 class="text-sm font-medium">
           {{ t('rightSlider.styleConfig') }}
@@ -386,7 +431,6 @@ const formatOptions = ref<Format[]>([`rgb`, `hex`, `hsl`, `hsv`])
 </template>
 
 <style scoped>
-/* 移动端右侧栏动画 - 只有添加了 animate 类才启用 */
 .mobile-right-drawer.animate {
   transition: transform 300ms cubic-bezier(0.16, 1, 0.3, 1);
 }

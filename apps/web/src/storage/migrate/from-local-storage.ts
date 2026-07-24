@@ -3,7 +3,8 @@ import type { PerThemeSettings, PerThemeSettingsMap, ThemeName } from '@md/share
 import type { IndexedDBEngine } from '@/storage/engines/indexed-db'
 import type { Post } from '@/types/post'
 import { defaultPerThemeSettings, defaultStyleConfig } from '@md/shared/configs'
-import { v4 as uuidv4 } from 'uuid'
+import { uuidv4 } from '@md/shared/utils/uuid'
+import { normalizePostHistory } from '@/lib/format/datetime'
 import { getDatabase } from '@/storage/db'
 import {
   isAppLocalStorageKey,
@@ -59,9 +60,9 @@ export interface MigrationResult {
 }
 
 /**
- * 迁移完成后清理 localStorage 中已迁入 IndexedDB 的应用数据。
- * @param explicitKeys 本次迁移涉及的 key；省略则扫描所有本应用 key
- * @returns 删除的 key 数量
+ * After migration, remove app data from localStorage that was moved to IndexedDB.
+ * @param explicitKeys Keys involved in this migration; omit to scan all app keys
+ * @returns Number of keys deleted
  */
 export function cleanupMigratedLocalStorage(explicitKeys?: string[]): number {
   const candidates = new Set<string>()
@@ -107,7 +108,7 @@ function parsePosts(raw: string): Post[] | null {
         ...post,
         createDatetime: new Date(post.createDatetime ?? now + index),
         updateDatetime: new Date(post.updateDatetime ?? now + index),
-        history: post.history ?? [],
+        history: normalizePostHistory(post.history),
       }
     })
   }
@@ -219,7 +220,7 @@ export async function migrateMpProfile(engine: IndexedDBEngine): Promise<void> {
 }
 
 /**
- * 将 localStorage 全量迁入 IndexedDB（首次启动执行一次）。
+ * One-time full migration from localStorage to IndexedDB on first launch.
  */
 export async function migrateFromLocalStorage(engine: IndexedDBEngine): Promise<MigrationResult> {
   const keysToMigrate: string[] = []
@@ -262,7 +263,7 @@ export async function migrateFromLocalStorage(engine: IndexedDBEngine): Promise<
   }
 }
 
-/** 清除 cache store */
+/** Clear the cache object store. */
 export async function clearCacheStore(): Promise<void> {
   const db = await getDatabase()
   await db.clear(STORE_CACHE)

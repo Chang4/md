@@ -1,5 +1,8 @@
-const MATHJAX_CDN_URL = `https://cdn-doocs.oss-cn-shenzhen.aliyuncs.com/npm/mathjax@3/es5/tex-svg.js`
-const MATHJAX_LOCAL_URL = `./static/libs/mathjax/tex-svg.js`
+/// <reference path="../mathjax.d.ts" />
+
+export const MATHJAX_CDN_URL = `https://cdn-doocs.oss-cn-shenzhen.aliyuncs.com/npm/mathjax@3/es5/tex-svg.js`
+export const MATHJAX_LOCAL_URL = `./static/libs/mathjax/tex-svg.js`
+
 const MATHJAX_SCRIPT_ID = `MathJax-script`
 
 function getMathJaxScriptUrl(): string {
@@ -51,7 +54,7 @@ export function loadMathJax(): Promise<void> {
       MathJax: {
         tex: { tags: `ams` },
         svg: { fontCache: `none` },
-        // 仅通过 tex2svg 在预览区渲染；禁止扫描整页 DOM，否则会改写 CodeMirror 编辑区内的 $$...$$
+        // Render via tex2svg in preview only; disable page scan or CodeMirror $$...$$ gets rewritten
         startup: {
           typeset: false,
         },

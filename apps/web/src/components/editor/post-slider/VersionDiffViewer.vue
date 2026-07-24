@@ -27,9 +27,11 @@ const diffLines = computed<DiffLine[]>(() => {
   const lines: DiffLine[] = []
   let currentSpans: DiffSpan[] = []
 
-  function pushLine() {
-    if (currentSpans.length === 0)
+  function pushLine(defaultType: DiffSpan['type'] = `equal`) {
+    if (currentSpans.length === 0) {
+      lines.push({ rowType: defaultType, spans: [] })
       return
+    }
     const types = new Set(currentSpans.map(s => s.type))
     types.delete(`equal`)
     const rowType: DiffLine['rowType']
@@ -55,7 +57,7 @@ const diffLines = computed<DiffLine[]>(() => {
     const subLines = text.split(`\n`)
     for (let i = 0; i < subLines.length; i++) {
       if (i > 0)
-        pushLine()
+        pushLine(type)
       const seg = subLines[i]
       if (seg.length > 0)
         currentSpans.push({ type, text: seg })
@@ -99,7 +101,18 @@ const lineNumbers = computed(() => {
   })
 })
 
-// ---- minimap ----
+const showAll = ref(false)
+
+const visibleLines = computed(() => {
+  const all = diffLines.value.map((line, idx) => ({
+    line,
+    lineNo: lineNumbers.value[idx],
+  }))
+  if (showAll.value)
+    return all
+  return all.filter(({ line }) => line.rowType !== `equal`)
+})
+
 const scrollContainer = ref<HTMLElement | null>(null)
 const minimapRef = ref<HTMLElement | null>(null)
 const viewportTop = ref(0)
@@ -133,25 +146,39 @@ onMounted(() => {
 
 <template>
   <div class="flex flex-col h-full">
-    <!-- 统计 -->
     <div class="flex items-center gap-3 px-3 py-1.5 border-b text-xs text-muted-foreground shrink-0">
       <span class="flex-1" />
+      <div class="inline-flex items-center rounded-md border p-0.5">
+        <button
+          type="button"
+          class="px-2 py-0.5 rounded-sm transition-colors"
+          :class="!showAll ? 'bg-primary text-primary-foreground' : 'hover:text-foreground'"
+          @click="showAll = false"
+        >
+          {{ t('versionDiff.showDiffOnly') }}
+        </button>
+        <button
+          type="button"
+          class="px-2 py-0.5 rounded-sm transition-colors"
+          :class="showAll ? 'bg-primary text-primary-foreground' : 'hover:text-foreground'"
+          @click="showAll = true"
+        >
+          {{ t('versionDiff.showAll') }}
+        </button>
+      </div>
       <span class="text-green-600 dark:text-green-400">+{{ stats.ins }}</span>
       <span class="text-red-600 dark:text-red-400">-{{ stats.del }}</span>
     </div>
 
-    <!-- 无差异 -->
     <div v-if="isIdentical" class="flex-1 flex items-center justify-center text-sm text-muted-foreground">
       {{ t('versionDiff.identical') }}
     </div>
 
-    <!-- 差异内容 -->
     <div v-else class="flex-1 flex overflow-hidden">
-      <!-- 主内容 -->
       <div ref="scrollContainer" class="flex-1 overflow-y-auto thin-scrollbar" @scroll="updateViewport">
         <div class="font-mono text-xs leading-5">
           <div
-            v-for="(line, idx) in diffLines"
+            v-for="({ line, lineNo }, idx) in visibleLines"
             :key="idx"
             class="flex"
             :class="{
@@ -162,11 +189,11 @@ onMounted(() => {
             <span
               class="select-none shrink-0 w-8 text-right pr-1 text-muted-foreground/30"
               :class="{ 'text-red-500/40': line.rowType === 'delete' }"
-            >{{ lineNumbers[idx].old ?? '' }}</span>
+            >{{ lineNo.old ?? '' }}</span>
             <span
               class="select-none shrink-0 w-8 text-right pr-1.5 text-muted-foreground/30 border-r border-border/50"
               :class="{ 'text-green-500/40': line.rowType === 'insert' }"
-            >{{ lineNumbers[idx].new ?? '' }}</span>
+            >{{ lineNo.new ?? '' }}</span>
             <span
               class="select-none shrink-0 w-5 text-center text-muted-foreground/40"
               :class="{
@@ -179,16 +206,14 @@ onMounted(() => {
         </div>
       </div>
 
-      <!-- 缩略图 -->
       <div
         ref="minimapRef"
         class="shrink-0 w-[18px] border-l border-border/50 relative cursor-pointer select-none bg-muted/20"
         @click="onMinimapClick"
       >
-        <!-- 变更标记 -->
         <div class="absolute inset-0 flex flex-col">
           <div
-            v-for="(line, idx) in diffLines"
+            v-for="({ line }, idx) in visibleLines"
             :key="idx"
             class="flex-1 min-h-px"
             :class="{
@@ -197,7 +222,6 @@ onMounted(() => {
             }"
           />
         </div>
-        <!-- 视口指示器 -->
         <div
           class="absolute left-0 right-0 border border-foreground/20 bg-foreground/5 rounded-sm pointer-events-none transition-[top,height] duration-100"
           :style="{ top: `${viewportTop}%`, height: `${Math.max(viewportHeight, 4)}%` }"

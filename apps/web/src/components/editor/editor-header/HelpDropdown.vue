@@ -55,7 +55,6 @@ function openReleases() {
 </script>
 
 <template>
-  <!-- 作为 MenubarSub 使用 -->
   <MenubarSub v-if="asSub">
     <MenubarSubTrigger>
       {{ t('menu.help') }}
@@ -68,7 +67,7 @@ function openReleases() {
           <span class="inline-flex items-center gap-0.5">
             <kbd class="bg-gray-2 px-1 dark:bg-stone-9">{{ ctrlSign }}</kbd>
             <kbd class="bg-gray-2 px-1 dark:bg-stone-9">{{ shiftSign }}</kbd>
-            <kbd class="bg-gray-2 px-1 dark:bg-stone-9">P</kbd>
+            <kbd class="bg-gray-2 px-1 dark:bg-stone-9">.</kbd>
           </span>
         </MenubarShortcut>
       </MenubarItem>
@@ -100,7 +99,6 @@ function openReleases() {
     </MenubarSubContent>
   </MenubarSub>
 
-  <!-- 作为 MenubarMenu 使用（默认） -->
   <MenubarMenu v-else>
     <MenubarTrigger>{{ t('menu.help') }}</MenubarTrigger>
     <MenubarContent align="start" class="min-w-56">
@@ -111,7 +109,7 @@ function openReleases() {
           <span class="inline-flex items-center gap-0.5">
             <kbd class="bg-gray-2 px-1 dark:bg-stone-9">{{ ctrlSign }}</kbd>
             <kbd class="bg-gray-2 px-1 dark:bg-stone-9">{{ shiftSign }}</kbd>
-            <kbd class="bg-gray-2 px-1 dark:bg-stone-9">P</kbd>
+            <kbd class="bg-gray-2 px-1 dark:bg-stone-9">.</kbd>
           </span>
         </MenubarShortcut>
       </MenubarItem>

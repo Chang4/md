@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Blocks, Image, Table } from '@lucide/vue'
+import { Blocks, FunctionSquare, Image, Table } from '@lucide/vue'
 import { normalizeFormulaInput } from '@/lib/markdown/formula'
 import { useEditorStore } from '@/stores/editor'
 import { useUIStore } from '@/stores/ui'
@@ -27,7 +27,6 @@ function openFormulaEditor() {
 </script>
 
 <template>
-  <!-- 作为 MenubarSub 使用 -->
   <MenubarSub v-if="asSub">
     <MenubarSubTrigger>
       {{ t('menu.insert') }}
@@ -38,7 +37,7 @@ function openFormulaEditor() {
         {{ t('menu.image') }}
       </MenubarItem>
       <MenubarItem @click="openFormulaEditor()">
-        <span class="mr-2 inline-flex h-4 w-4 items-center justify-center text-xs font-semibold">ƒ</span>
+        <FunctionSquare class="mr-2 h-4 w-4" />
         {{ t('menu.formula') }}
       </MenubarItem>
       <MenubarItem @click="toggleShowInsertFormDialog()">
@@ -52,7 +51,6 @@ function openFormulaEditor() {
     </MenubarSubContent>
   </MenubarSub>
 
-  <!-- 作为 MenubarMenu 使用（默认） -->
   <MenubarMenu v-else>
     <MenubarTrigger>
       {{ t('menu.insert') }}
@@ -63,7 +61,7 @@ function openFormulaEditor() {
         {{ t('menu.image') }}
       </MenubarItem>
       <MenubarItem @click="openFormulaEditor()">
-        <span class="mr-2 inline-flex h-4 w-4 items-center justify-center text-xs font-semibold">ƒ</span>
+        <FunctionSquare class="mr-2 h-4 w-4" />
         {{ t('menu.formula') }}
       </MenubarItem>
       <MenubarItem @click="toggleShowInsertFormDialog()">

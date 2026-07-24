@@ -22,6 +22,7 @@ const LocalImageUploadDialog = defineAsyncComponent(() => import('@/components/e
 const FormulaEditorDialog = defineAsyncComponent(() => import('@/components/editor/dialogs/FormulaEditorDialog.vue'))
 const TemplateDialog = defineAsyncComponent(() => import('@/components/editor/dialogs/TemplateDialog.vue'))
 const CustomComponentDialog = defineAsyncComponent(() => import('@/components/editor/dialogs/CustomComponentDialog.vue'))
+const MarketplaceDialog = defineAsyncComponent(() => import('@/components/editor/dialogs/MarketplaceDialog.vue'))
 
 const uiStore = useUIStore()
 
@@ -39,23 +40,19 @@ const {
   isShowFormulaEditorDialog,
   isShowTemplateDialog,
   isShowComponentDialog,
+  isShowMarketplaceDialog,
 } = storeToRefs(uiStore)
 
-// --- 子组件引用 ---
 const editorPanelCompRef = ref<InstanceType<typeof EditorPanel> | null>(null)
 const previewPanelCompRef = ref<InstanceType<typeof PreviewPanel> | null>(null)
 
-// 从子组件获取 codeMirrorView 和 previewRef (使用 getter 避免 DeepReadonly 类型问题)
 const getEditorView = () => editorPanelCompRef.value?.codeMirrorView ?? null
 const getPreviewContainer = () => previewPanelCompRef.value?.previewRef ?? null
 
-// --- 点击预览内容跳转到编辑器对应位置 ---
 const { handlePreviewContentClick } = useCursorSync(getEditorView)
 
-// --- 滚动同步 ---
 useScrollSync(getEditorView, getPreviewContainer, enableScrollSync)
 
-// --- 复制状态 ---
 const backLight = ref(false)
 const isCoping = ref(false)
 let copyEndTimer: ReturnType<typeof setTimeout> | null = null
@@ -83,12 +80,10 @@ onUnmounted(() => {
   }
 })
 
-// --- 上传图片透传 ---
 function handleUploadImage(file: File, cb?: any, applyUrl?: boolean) {
   editorPanelCompRef.value?.uploadImage(file, cb, applyUrl)
 }
 
-// --- 面板尺寸配置 ---
 const hasSidePanel = computed(() => !isMobile.value && (isOpenRightSlider.value || uiStore.isShowCssEditor))
 
 const editorPanelConfig = computed(() => {
@@ -182,7 +177,6 @@ onMounted(() => {
   })
 })
 
-// --- 进度条 ---
 const isImgLoading = computed(() => unref(editorPanelCompRef.value?.isImgLoading) ?? false)
 </script>
 
@@ -219,10 +213,8 @@ const isImgLoading = computed(() => unref(editorPanelCompRef.value?.isImgLoading
           </ResizablePanel>
           <ResizableHandle v-if="!isMobile && isOpenFolderPanel" class="hidden md:block" />
 
-          <!-- 主内容区域 (嵌套灵动布局) -->
           <ResizablePanel :min-size="30">
             <ResizablePanelGroup direction="horizontal">
-              <!-- Markdown 编辑器 -->
               <ResizablePanel
                 ref="editorResizablePanelRef"
                 :order="1"
@@ -236,7 +228,6 @@ const isImgLoading = computed(() => unref(editorPanelCompRef.value?.isImgLoading
               </ResizablePanel>
               <ResizableHandle v-show="viewMode === 'split'" />
 
-              <!-- 预览区 -->
               <ResizablePanel
                 ref="previewResizablePanelRef"
                 :order="2"
@@ -254,7 +245,6 @@ const isImgLoading = computed(() => unref(editorPanelCompRef.value?.isImgLoading
                 />
               </ResizablePanel>
 
-              <!-- CSS 编辑器面板 -->
               <ResizableHandle v-show="!isMobile && uiStore.isShowCssEditor" class="hidden md:block" />
               <ResizablePanel
                 ref="cssEditorPanelRef"
@@ -268,7 +258,6 @@ const isImgLoading = computed(() => unref(editorPanelCompRef.value?.isImgLoading
                 <CssEditor v-if="!isMobile && uiStore.isShowCssEditor" />
               </ResizablePanel>
 
-              <!-- 样式面板 -->
               <ResizableHandle v-show="!isMobile && isOpenRightSlider" class="hidden md:block right-slider-handle" />
               <ResizablePanel
                 ref="rightSliderPanelRef"
@@ -279,12 +268,12 @@ const isImgLoading = computed(() => unref(editorPanelCompRef.value?.isImgLoading
                 :max-size="!isMobile && isOpenRightSlider ? 60 : 0"
                 collapsible
                 :collapsed-size="0"
+                @collapse="isOpenRightSlider = false"
               >
                 <RightSlider v-if="!isMobile && isOpenRightSlider" />
               </ResizablePanel>
             </ResizablePanelGroup>
 
-            <!-- 移动端：组件内部用 transform 控制显隐，需保持挂载以保留滑入动画 -->
             <CssEditor v-if="isMobile" />
             <RightSlider v-if="isMobile" />
           </ResizablePanel>
@@ -304,6 +293,8 @@ const isImgLoading = computed(() => unref(editorPanelCompRef.value?.isImgLoading
       <TemplateDialog v-if="isShowTemplateDialog" />
 
       <CustomComponentDialog v-if="isShowComponentDialog" />
+
+      <MarketplaceDialog v-if="isShowMarketplaceDialog" />
     </main>
 
     <Footer />

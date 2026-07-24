@@ -26,6 +26,8 @@ export default {
     enableScrollSync: `Enable scroll sync`,
     lastModified: `Last modified`,
     toggleDarkMode: `Toggle dark mode`,
+    toggleLanguage: `Toggle language`,
+    switchToLanguage: `Switch to {language}`,
   },
   rightSlider: {
     title: `Styles`,
@@ -37,6 +39,7 @@ export default {
     citeStatus: `Link → footnote`,
     paragraphIndent: `Indent`,
     paragraphJustify: `Justify`,
+    wordCount: `Word count`,
     selectCodeBlockTheme: `Code theme`,
   },
   contextMenu: {
@@ -77,6 +80,7 @@ export default {
       settings: `Settings`,
     },
     openPreferences: `Open preferences`,
+    toggleLanguage: `Toggle language`,
     viewEdit: `View: Edit`,
     viewSplit: `View: Split`,
     viewPreview: `View: Preview`,

@@ -1,4 +1,5 @@
 import { storeToRefs } from 'pinia'
+import { isAppLocale } from '@/i18n/constants'
 import { store } from '@/storage/manager'
 import { addPrefix } from '@/storage/prefix'
 import { parseStoredValue } from '@/storage/quota'
@@ -7,6 +8,7 @@ import { useCssEditorStore } from '@/stores/cssEditor'
 import { useCustomComponentStore } from '@/stores/customComponent'
 import { useEditorStore } from '@/stores/editor'
 import { useLocaleStore } from '@/stores/locale'
+import { useMarketplaceStore } from '@/stores/marketplace'
 import { usePostStore } from '@/stores/post'
 import { useQuickCommandsStore } from '@/stores/quickCommands'
 import { useRenderStore } from '@/stores/render'
@@ -25,6 +27,8 @@ const PREVIEW_REFRESH_KEYS = new Set([
   `previewWidth`,
   addPrefix(`css_content_config`),
   addPrefix(`custom_components`),
+  addPrefix(`marketplace_installed_themes`),
+  addPrefix(`marketplace_installed_components`),
 ])
 
 function hydrateRef<T>(key: string, keys: Set<string>, ref: { value: T }): void {
@@ -49,7 +53,7 @@ async function refreshPreview(keys: Set<string>): Promise<void> {
   renderStore.render(editorStore.getContent())
 }
 
-/** 将已写入本地存储的远端设置同步到各 Pinia Store，无需整页刷新 */
+/** Hydrate Pinia stores from remote settings already written to local storage (no full reload). */
 export async function hydrateSyncedSettings(appliedKeys: string[]): Promise<void> {
   if (!appliedKeys.length)
     return
@@ -90,8 +94,8 @@ export async function hydrateSyncedSettings(appliedKeys: string[]): Promise<void
 
   if (keys.has(`locale`)) {
     const raw = store.getSync(`locale`)
-    if (raw === `zh-CN` || raw === `en-US`)
-      useLocaleStore().setLocale(raw)
+    if (isAppLocale(raw))
+      await useLocaleStore().setLocale(raw)
   }
 
   hydrateRef(`openai_type`, keys, aiConfig.type)
@@ -102,6 +106,10 @@ export async function hydrateSyncedSettings(appliedKeys: string[]): Promise<void
   hydrateRef(addPrefix(`templates`), keys, template.templates)
   hydrateRef(addPrefix(`custom_components`), keys, customComponent.userComponents)
   hydrateRef(addPrefix(`sort_mode`), keys, post.sortMode)
+
+  const marketplace = storeToRefs(useMarketplaceStore())
+  hydrateRef(addPrefix(`marketplace_installed_themes`), keys, marketplace.installedThemes)
+  hydrateRef(addPrefix(`marketplace_installed_components`), keys, marketplace.installedComponents)
 
   if (keys.has(`quick_commands`))
     await quickCommandsStore.reloadFromStorage()

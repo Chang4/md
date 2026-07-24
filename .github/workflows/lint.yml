@@ -18,18 +18,21 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          # Pin exact version: pnpm 11.12.0 self-update crashes in action-setup
+          # https://github.com/pnpm/action-setup/issues/276
+          version: 11.11.0
+
       - name: Set up node
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v7
         with:
           node-version: 22
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v5
-        with:
-          version: 11
+          cache: pnpm
 
       - name: Install dependencies
-        run: pnpm install
+        run: pnpm install --frozen-lockfile
 
       - name: Run lint
         run: pnpm run lint
@@ -42,18 +45,21 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          # Pin exact version: pnpm 11.12.0 self-update crashes in action-setup
+          # https://github.com/pnpm/action-setup/issues/276
+          version: 11.11.0
+
       - name: Set up node
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v7
         with:
           node-version: 22
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v5
-        with:
-          version: 11
+          cache: pnpm
 
       - name: Install dependencies
-        run: pnpm install
+        run: pnpm install --frozen-lockfile
 
       - name: Run type-check
         run: pnpm run type-check
@@ -66,18 +72,21 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          # Pin exact version: pnpm 11.12.0 self-update crashes in action-setup
+          # https://github.com/pnpm/action-setup/issues/276
+          version: 11.11.0
+
       - name: Set up node
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v7
         with:
           node-version: 22
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v5
-        with:
-          version: 11
+          cache: pnpm
 
       - name: Install dependencies
-        run: pnpm install
+        run: pnpm install --frozen-lockfile
 
       - name: Run tests
         run: pnpm run test

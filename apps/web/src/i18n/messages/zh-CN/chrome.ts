@@ -26,6 +26,8 @@ export default {
     enableScrollSync: `开启同步滚动`,
     lastModified: `上次修改时间`,
     toggleDarkMode: `切换深色模式`,
+    toggleLanguage: `切换语言`,
+    switchToLanguage: `切换为 {language}`,
   },
   rightSlider: {
     title: `样式`,
@@ -37,6 +39,7 @@ export default {
     citeStatus: `外链转引用`,
     paragraphIndent: `首行缩进`,
     paragraphJustify: `两端对齐`,
+    wordCount: `字数统计`,
     selectCodeBlockTheme: `代码主题`,
   },
   contextMenu: {
@@ -77,6 +80,7 @@ export default {
       settings: `设置`,
     },
     openPreferences: `打开偏好设置`,
+    toggleLanguage: `切换语言`,
     viewEdit: `视图：编辑`,
     viewSplit: `视图：双屏`,
     viewPreview: `视图：预览`,

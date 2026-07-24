@@ -3,6 +3,8 @@ import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 import { activateHandler } from './activate'
 import { authMiddleware, authRoutes, meHandler } from './auth'
+import { marketplaceRoutes } from './marketplace'
+import { notificationRoutes } from './notifications'
 import { isAllowedOrigin, isBrowserExtensionOrigin } from './origin'
 import { createShareHandler, deleteShareHandler, listSharesHandler, unlockShareHandler, viewShareHandler } from './share'
 import { SHARE_FAVICON_PATH } from './share-head'
@@ -12,11 +14,11 @@ import { afdianWebhookHandler } from './webhook'
 
 const app = new Hono<{ Bindings: Env, Variables: { userId: string } }>()
 
-// CORS：允许 APP_URL 中配置的来源（支持通配符，逗号分隔）携带凭据访问
+// CORS: allow credentialed requests from origins listed in APP_URL (comma-separated, wildcards supported)
 app.use(`*`, async (c, next) => {
   const handler = cors({
     origin: origin => (isAllowedOrigin(c.env, origin) || isBrowserExtensionOrigin(origin) ? origin : null),
-    allowMethods: [`GET`, `POST`, `DELETE`, `OPTIONS`],
+    allowMethods: [`GET`, `POST`, `PATCH`, `DELETE`, `OPTIONS`],
     allowHeaders: [`Authorization`, `Content-Type`],
     credentials: true,
     maxAge: 86400,
@@ -26,20 +28,23 @@ app.use(`*`, async (c, next) => {
 
 app.get(`/`, c => c.json({ name: `md-api`, ok: true }))
 
-// 默认图床上传（公开，由 UPLOAD_ENABLED 控制）
+// Default image upload (public; gated by UPLOAD_ENABLED)
 app.post(`/upload`, uploadHandler)
 
 app.get(SHARE_FAVICON_PATH, c => c.env.ASSETS.fetch(c.req.raw))
 
 app.route(`/auth`, authRoutes)
-// 爱发电 Webhook：无密钥与带路径密钥两种形式共用同一处理器。
-// 设置 AFDIAN_WEBHOOK_TOKEN 后，仅 `/webhooks/afdian/<token>` 可通过校验。
+// Afdian webhook: unauthenticated and path-token routes share one handler.
+// When AFDIAN_WEBHOOK_TOKEN is set, only /webhooks/afdian/<token> passes validation.
 app.post(`/webhooks/afdian`, afdianWebhookHandler)
 app.post(`/webhooks/afdian/:token`, afdianWebhookHandler)
 
-// 公开分享：只读 HTML 预览页 + 密码解锁
+// Public shares: read-only HTML preview + password unlock
 app.get(`/s/:shareId`, viewShareHandler)
 app.post(`/s/:shareId/unlock`, unlockShareHandler)
+
+// Theme / component marketplace (public browse + auth publish/admin)
+app.route(`/marketplace`, marketplaceRoutes)
 
 const api = new Hono<{ Bindings: Env, Variables: { userId: string } }>()
 api.use(`*`, authMiddleware)
@@ -50,6 +55,7 @@ api.post(`/sync/activate`, activateHandler)
 api.get(`/share`, listSharesHandler)
 api.post(`/share`, createShareHandler)
 api.delete(`/share/:id`, deleteShareHandler)
+api.route(`/notifications`, notificationRoutes)
 
 app.route(`/`, api)
 

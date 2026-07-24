@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ArrowUpFromLine } from '@lucide/vue'
-import { throttle } from 'es-toolkit'
+import { useThrottleFn } from '@vueuse/core'
 
 type Target = HTMLElement | Window | null
 
@@ -14,6 +14,7 @@ const props = defineProps<{
   onClick?: (e: MouseEvent) => void
 }>()
 
+const { t } = useI18n()
 const visibilityHeight = ref(props.visibilityHeight ?? 400)
 const visible = ref(false)
 
@@ -24,14 +25,14 @@ function scrollToTop(e: MouseEvent) {
   props.onClick?.(e)
 }
 
-const throttledScroll = throttle((el: Target) => {
+const throttledScroll = useThrottleFn((el: Target) => {
   if (el instanceof HTMLElement) {
     visible.value = el.scrollTop > visibilityHeight.value
   }
   else {
     visible.value = window.scrollY > visibilityHeight.value
   }
-}, 200, { edges: [`leading`, `trailing`] })
+}, 200, true, true)
 
 function handleScroll() {
   throttledScroll(target.value)
@@ -54,7 +55,16 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <Button v-if="visible" variant="outline" size="icon" class="absolute z-50 rounded-full border-border/40 bg-background/60 text-muted-foreground/70 backdrop-blur-sm hover:bg-background/80 hover:text-foreground" :style="{ left: `${left}px`, top: `${top}px`, right: `${right}px`, bottom: `${bottom}px` }" @click="scrollToTop">
+  <Button
+    v-if="visible"
+    variant="outline"
+    size="icon"
+    class="absolute z-50 rounded-full border-border/40 bg-background/60 text-muted-foreground/70 backdrop-blur-sm hover:bg-background/80 hover:text-foreground"
+    :style="{ left: `${left}px`, top: `${top}px`, right: `${right}px`, bottom: `${bottom}px` }"
+    :aria-label="t('common.backToTop')"
+    :title="t('common.backToTop')"
+    @click="scrollToTop"
+  >
     <ArrowUpFromLine />
   </Button>
 </template>

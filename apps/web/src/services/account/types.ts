@@ -1,7 +1,7 @@
-/** 用户套餐（后续可扩展更多高级能力） */
+/** User plan (extensible for future premium features). */
 export type UserPlan = `free` | `pro`
 
-/** 账户用户信息（与 md-api /me 一致） */
+/** Account user profile (matches md-api /me). */
 export interface AccountUser {
   id: string
   login: string
@@ -9,4 +9,6 @@ export interface AccountUser {
   avatar: string | null
   plan: UserPlan
   planExpiresAt: number | null
+  /** Marketplace reviewer (ADMIN_GITHUB_LOGINS) */
+  isAdmin?: boolean
 }
