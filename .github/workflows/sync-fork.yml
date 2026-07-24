@@ -19,21 +19,27 @@ jobs:
         with:
           fetch-depth: 0 
 
-      # 2. 添加原作者的仓库为 upstream
+      # 2. 配置 Git 用户信息
+      - name: Configure Git
+        run: |
+          git config --global user.email "action@github.com"
+          git config --global user.name "GitHub Action"
+
+      # 3. 添加原作者的仓库为 upstream
       - name: Add upstream remote
         run: git remote add upstream https://github.com/doocs/md.git
 
-      # 3. 拉取原作者的最新代码
+      # 4. 拉取原作者的最新代码
       - name: Fetch upstream
         run: git fetch upstream
 
-      # 4. 将原作者的 main 分支合并到你的 main 分支
+      # 5. 将原作者的 main 分支合并到你的 main 分支
       - name: Merge upstream changes
         run: |
           git checkout main
           git merge upstream/main
 
-      # 5. 将合并后的最新代码推送到你的 Fork 仓库
+      # 6. 将合并后的最新代码推送到你的 Fork 仓库
       - name: Push changes to fork
         uses: ad-m/github-push-action@master
         with:
