@@ -12,13 +12,13 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
-      workflows: write
     steps:
       # 1. 检出你的 Fork 仓库代码（获取完整历史记录以便合并）
       - name: Checkout fork
         uses: actions/checkout@v4
         with:
           fetch-depth: 0 
+          token: ${{ secrets.PAT_TOKEN }}   # 用 PAT 检出，避免后续 push 权限不足
 
       # 2. 配置 Git 用户信息
       - name: Configure Git
@@ -45,4 +45,4 @@ jobs:
         uses: ad-m/github-push-action@master
         with:
           branch: main
-          github_token: ${{ secrets.GITHUB_TOKEN }}
+          github_token: ${{ secrets.PAT_TOKEN }}   # 用 PAT 推送
