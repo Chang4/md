@@ -2,6 +2,8 @@
 import type { Post, PostAccount } from '@md/shared/types'
 import { Check, ChevronDown, ChevronRight, Info, Loader2, Minus } from '@lucide/vue'
 import { CheckboxIndicator, CheckboxRoot, Primitive } from 'reka-ui'
+import { accountHandle, isSignedInAccount } from '@/lib/post/account-label'
+import { extractPublishDraft } from '@/lib/post/publish-draft'
 import { useEditorStore } from '@/stores/editor'
 import { useRenderStore } from '@/stores/render'
 import { useUIStore } from '@/stores/ui'
@@ -48,15 +50,22 @@ const devtoSetupUrl = computed(() => {
 })
 const devtoAccount = computed(() => allAccounts.value.find(account => account.type === 'devto'))
 
-const wordPressSetupOpen = ref(false)
-const wordPressFormHeight = ref(280)
-const wordPressSetupUrl = computed(() => {
-  const src = window.$cose?.getWordPressSetupUrl?.()
+type SelfHostedPlatform = 'wordpress' | 'halo'
+const selfHostedSetup = ref<SelfHostedPlatform | null>(null)
+const selfHostedFormHeight = ref(280)
+
+function isSelfHosted(type: string): type is SelfHostedPlatform {
+  return type === 'wordpress' || type === 'halo'
+}
+
+function selfHostedUrl(type: SelfHostedPlatform) {
+  const cose = window.$cose
+  const src = type === 'halo' ? cose?.getHaloSetupUrl?.() : cose?.getWordPressSetupUrl?.()
   if (!src)
     return null
   try {
     const url = new URL(src)
-    if (!['chrome-extension:', 'moz-extension:'].includes(url.protocol) || url.pathname !== '/wordpress-connect.html')
+    if (!['chrome-extension:', 'moz-extension:'].includes(url.protocol) || url.pathname !== `/${type}-connect.html`)
       return null
     url.searchParams.set('lang', locale.value)
     return url
@@ -64,7 +73,14 @@ const wordPressSetupUrl = computed(() => {
   catch {
     return null
   }
-})
+}
+
+const selfHostedSetupUrl = computed(() => selfHostedSetup.value ? selfHostedUrl(selfHostedSetup.value) : null)
+
+function toggleSelfHosted(type: SelfHostedPlatform) {
+  selfHostedFormHeight.value = 280
+  selfHostedSetup.value = selfHostedSetup.value === type ? null : type
+}
 
 const form = ref<Post>({
   title: ``,
@@ -75,7 +91,7 @@ const form = ref<Post>({
   accounts: [] as PostAccount[],
 })
 
-const allowPost = computed(() => extensionInstalled.value && allAccounts.value.some(a => a.checked && a.loggedIn))
+const allowPost = computed(() => extensionInstalled.value && allAccounts.value.some(a => a.checked && isSignedInAccount(a)))
 
 const platformCategories = [
   {
@@ -84,7 +100,7 @@ const platformCategories = [
   },
   {
     id: `blog`,
-    platforms: [`csdn`, `cnblogs`, `juejin`, `medium`, `devto`, `cto51`, `segmentfault`, `oschina`, `infoq`, `jianshu`, `wordpress`],
+    platforms: [`csdn`, `cnblogs`, `juejin`, `medium`, `devto`, `cto51`, `segmentfault`, `oschina`, `infoq`, `jianshu`, `wordpress`, `halo`, `substack`],
   },
   {
     id: `cloud`,
@@ -104,69 +120,77 @@ function toggleCategory(categoryName: string) {
   }
 }
 
+const substackSetupOpen = ref(false)
+const substackFormHeight = ref(120)
+const substackSetupUrl = computed(() => {
+  const src = extensionInstalled.value && window.$cose?.getSubstackSetupUrl?.()
+  if (!src)
+    return null
+  try {
+    const url = new URL(src)
+    if (!['chrome-extension:', 'moz-extension:'].includes(url.protocol) || url.pathname !== '/substack-connect.html')
+      return null
+    url.searchParams.set('lang', locale.value)
+    return url
+  }
+  catch {
+    return null
+  }
+})
+const substackPlaceholder: PostAccount = {
+  uid: 'substack',
+  type: 'substack',
+  title: 'Substack',
+  displayName: 'Substack',
+  icon: 'https://substack.com/favicon.ico',
+  home: '',
+  checked: false,
+  loggedIn: false,
+}
+
 const accountsByCategory = computed(() => {
   return platformCategories.map(category => ({
     id: category.id,
     name: t(`postInfo.categories.${category.id}`),
     accounts: category.platforms
-      .map(type => allAccounts.value.find(a => a.type === type))
+      .map(type => allAccounts.value.find(a => a.type === type)
+        ?? (type === 'substack' && extensionInstalled.value ? substackPlaceholder : undefined))
       .filter((a): a is PostAccount => a !== undefined),
   }))
 })
 
 // Whether category is fully selected (logged-in only)
 function isCategoryAllSelected(accounts: PostAccount[]) {
-  const loggedInAccounts = accounts.filter(a => a.loggedIn)
+  const loggedInAccounts = accounts.filter(isSignedInAccount)
   return loggedInAccounts.length > 0 && loggedInAccounts.every(a => a.checked)
 }
 
 function isCategoryIndeterminate(accounts: PostAccount[]) {
-  const loggedInAccounts = accounts.filter(a => a.loggedIn)
+  const loggedInAccounts = accounts.filter(isSignedInAccount)
   const checkedCount = loggedInAccounts.filter(a => a.checked).length
   return checkedCount > 0 && checkedCount < loggedInAccounts.length
 }
 
 function toggleCategorySelectAll(accounts: PostAccount[]) {
-  const loggedInAccounts = accounts.filter(a => a.loggedIn)
+  const loggedInAccounts = accounts.filter(isSignedInAccount)
   const allSelected = loggedInAccounts.every(a => a.checked)
   loggedInAccounts.forEach(a => a.checked = !allSelected)
 }
 
-async function prePost() {
+function prePost() {
   // Start detection when extension installed but no account data
   if (extensionInstalled.value && allAccounts.value.length === 0) {
     // Fire-and-forget; detection runs in background
     startLoginDetection()
   }
 
-  let auto: Post = {
-    thumb: ``,
-    title: ``,
-    desc: ``,
-    content: ``,
-    markdown: ``,
-    accounts: [],
-  }
-  const accounts = allAccounts.value.filter(a => ![`ipfs`].includes(a.type))
-  try {
-    auto = {
-      thumb: document.querySelector<HTMLImageElement>(`#output img`)?.src ?? ``,
-      title: [1, 2, 3, 4, 5, 6]
-        .map(h => document.querySelector(`#output h${h}`))
-        .find(h => h)
-        ?.textContent ?? ``,
-      desc: document.querySelector(`#output p`)?.textContent?.trim() ?? ``,
-      content: output.value,
-      markdown: editor.value?.state.doc.toString() ?? ``,
-      accounts,
-    }
-  }
-  catch {
-  }
-  finally {
-    form.value = {
-      ...auto,
-    }
+  const markdown = editor.value?.state.doc.toString() ?? ``
+  const draft = extractPublishDraft(output.value, markdown)
+  form.value = {
+    ...draft,
+    content: output.value,
+    markdown,
+    accounts: allAccounts.value.filter(account => account.type !== `ipfs`),
   }
 }
 
@@ -175,7 +199,8 @@ watch(dialogVisible, (newVal) => {
     prePost()
   }
   else {
-    wordPressSetupOpen.value = false
+    selfHostedSetup.value = null
+    substackSetupOpen.value = false
   }
 })
 
@@ -291,7 +316,7 @@ async function getAccounts(): Promise<void> {
 }
 
 function post() {
-  form.value.accounts = allAccounts.value.filter(a => a.checked && a.loggedIn)
+  form.value.accounts = allAccounts.value.filter(a => a.checked && isSignedInAccount(a))
   postTaskDialogVisible.value = true
   dialogVisible.value = false
 }
@@ -341,43 +366,68 @@ function getPlatformUrl(type: string): string {
   return urls[type] || '#'
 }
 
-let wordPressCheck = 0
+const selfHostedChecks = { wordpress: 0, halo: 0 }
 
-async function recheckWordPress() {
-  const check = ++wordPressCheck
+async function recheckSelfHosted(type: SelfHostedPlatform) {
+  const check = ++selfHostedChecks[type]
   try {
     await window.$cose?.getAccounts?.((accounts) => {
-      const account = accounts.find(a => a.type === 'wordpress')
-      const index = allAccounts.value.findIndex(a => a.type === 'wordpress')
-      if (account && index >= 0 && check === wordPressCheck)
+      const account = accounts.find(a => a.type === type)
+      const index = allAccounts.value.findIndex(a => a.type === type)
+      if (account && index >= 0 && check === selfHostedChecks[type])
         allAccounts.value[index] = { ...account, isChecking: false }
-    }, ['wordpress'])
+    }, [type])
   }
   catch {
     // The extension can be reloaded while the dialog is open.
   }
 }
 
-function initializeWordPressFrame(event: Event) {
-  const url = wordPressSetupUrl.value
+function initializeSelfHostedFrame(event: Event) {
+  const url = selfHostedSetupUrl.value
   const frame = event.currentTarget as HTMLIFrameElement
   if (url)
-    frame.contentWindow?.postMessage({ type: 'cose-wordpress-initialize' }, `${url.protocol}//${url.host}`)
+    frame.contentWindow?.postMessage({ type: `cose-${selfHostedSetup.value}-initialize` }, `${url.protocol}//${url.host}`)
 }
 
 useEventListener('message', (event: MessageEvent) => {
-  const url = wordPressSetupUrl.value
-  const frame = document.querySelector<HTMLIFrameElement>('#wordpress-setup-frame')
+  const url = selfHostedSetupUrl.value
+  const frame = document.querySelector<HTMLIFrameElement>('#self-hosted-setup-frame')
+  const type = selfHostedSetup.value
+  if (!type || !url || !frame || event.source !== frame.contentWindow || event.origin !== `${url.protocol}//${url.host}`)
+    return
+
+  if (event.data?.type === `cose-${type}-form-height`) {
+    const height = event.data.height
+    if (Number.isInteger(height) && height > 0 && height <= 640)
+      selfHostedFormHeight.value = height
+  }
+  else if (event.data?.type === `cose-${type}-connection-changed`) {
+    void recheckSelfHosted(type)
+  }
+})
+
+function initializeSubstackFrame(event: Event) {
+  const url = substackSetupUrl.value
+  const frame = event.currentTarget as HTMLIFrameElement
+  if (url)
+    frame.contentWindow?.postMessage({ type: 'cose-substack-initialize' }, `${url.protocol}//${url.host}`)
+}
+
+useEventListener('message', (event: MessageEvent) => {
+  const url = substackSetupUrl.value
+  const frame = document.querySelector<HTMLIFrameElement>('#substack-setup-frame')
   if (!url || !frame || event.source !== frame.contentWindow || event.origin !== `${url.protocol}//${url.host}`)
     return
 
-  if (event.data?.type === 'cose-wordpress-form-height') {
+  if (event.data?.type === 'cose-substack-form-height') {
     const height = event.data.height
     if (Number.isInteger(height) && height > 0 && height <= 640)
-      wordPressFormHeight.value = height
+      substackFormHeight.value = height
   }
-  else if (event.data?.type === 'cose-wordpress-connection-changed') {
-    void recheckWordPress()
+  else if (event.data?.type === 'cose-substack-connection-changed') {
+    substackSetupOpen.value = false
+    startLoginDetection()
   }
 })
 
@@ -429,7 +479,7 @@ onBeforeMount(() => {
       </DialogTrigger>
       <DialogContent
         class="!max-w-[95vw] !w-[min(750px,95vw)] max-h-[85vh] flex flex-col overflow-hidden"
-        @interact-outside="wordPressSetupOpen && $event.preventDefault()"
+        @interact-outside="(selfHostedSetup || substackSetupOpen) && $event.preventDefault()"
       >
         <DialogHeader>
           <DialogTitle>{{ t('postInfo.title') }}</DialogTitle>
@@ -467,7 +517,7 @@ onBeforeMount(() => {
             </AlertDescription>
           </Alert>
 
-          <div class="w-full flex flex-col gap-4" :class="{ 'pointer-events-none opacity-50': !extensionInstalled }" :inert="!extensionInstalled || undefined" :aria-disabled="!extensionInstalled">
+          <div v-if="extensionInstalled" class="w-full flex flex-col gap-4">
             <div class="grid grid-cols-1 items-center gap-2 sm:grid-cols-[minmax(5.5rem,auto)_1fr] sm:gap-x-4">
               <Label for="thumb" class="sm:text-end">
                 {{ t('postInfo.cover') }}
@@ -530,7 +580,7 @@ onBeforeMount(() => {
                     >
                       <CheckboxRoot
                         v-model="account.checked"
-                        :disabled="!account.loggedIn"
+                        :disabled="!isSignedInAccount(account)"
                         class="bg-background hover:bg-muted h-[18px] w-[18px] flex shrink-0 appearance-none items-center justify-center border border-gray-300 rounded-[3px] outline-hidden disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         <CheckboxIndicator>
@@ -538,6 +588,7 @@ onBeforeMount(() => {
                         </CheckboxIndicator>
                       </CheckboxRoot>
                       <img
+                        v-if="account.icon"
                         :src="account.icon"
                         alt=""
                         class="inline-block h-[16px] w-[16px] shrink-0"
@@ -547,7 +598,7 @@ onBeforeMount(() => {
                         <Loader2 class="ml-1 h-3.5 w-3.5 animate-spin text-muted-foreground" />
                         <span class="text-xs text-muted-foreground">{{ t('postInfo.checking') }}</span>
                       </template>
-                      <template v-else-if="account.loggedIn">
+                      <template v-else-if="isSignedInAccount(account) || (account.type === 'substack' && account.loggedIn)">
                         <img
                           v-if="account.avatar"
                           :src="account.avatar"
@@ -555,7 +606,7 @@ onBeforeMount(() => {
                           class="ml-1 h-4 w-4 rounded-full object-cover"
                           @error="onAvatarError(account, $event)"
                         >
-                        <span class="truncate text-sm text-muted-foreground">@{{ account.displayName }}</span>
+                        <span v-if="accountHandle(account)" class="truncate text-sm text-muted-foreground">@{{ accountHandle(account) }}</span>
                         <button
                           v-if="account.type === 'devto'"
                           type="button"
@@ -577,8 +628,11 @@ onBeforeMount(() => {
                       >
                         {{ t(devtoGuideOpen ? 'postInfo.devtoCollapse' : 'postInfo.devtoConnect') }}
                       </button>
+                      <span v-else-if="account.type === 'substack' && !substackSetupUrl" class="text-xs text-muted-foreground">
+                        {{ t('postInfo.substackUpdateExtension') }}
+                      </span>
                       <Primitive
-                        v-else-if="account.type !== 'wordpress'"
+                        v-else-if="!isSelfHosted(account.type) && account.type !== 'substack'"
                         as="a"
                         :href="getPlatformUrl(account.type)"
                         target="_blank"
@@ -588,29 +642,55 @@ onBeforeMount(() => {
                         {{ t('common.login') }}
                       </Primitive>
                       <button
-                        v-if="account.type === 'wordpress' && !account.isChecking && wordPressSetupUrl"
+                        v-if="account.type === 'substack' && !account.isChecking && substackSetupUrl"
+                        type="button"
+                        class="ml-1 shrink-0 text-sm text-primary hover:underline"
+                        :aria-expanded="substackSetupOpen"
+                        aria-controls="substack-setup"
+                        @click="substackSetupOpen = !substackSetupOpen"
+                      >
+                        {{ substackSetupOpen ? t('common.close') : isSignedInAccount(account) ? t('commandPalette.group.settings') : t('postInfo.substackConnect') }}
+                      </button>
+                      <button
+                        v-if="isSelfHosted(account.type) && (account.type === 'halo' || !account.isChecking) && extensionInstalled && selfHostedUrl(account.type)"
                         type="button"
                         class="ml-1 shrink-0 text-sm text-muted-foreground hover:underline"
-                        :aria-expanded="wordPressSetupOpen"
-                        aria-controls="wordpress-setup"
-                        @click="wordPressSetupOpen = !wordPressSetupOpen"
+                        :aria-expanded="selfHostedSetup === account.type"
+                        aria-controls="self-hosted-setup"
+                        @click="toggleSelfHosted(account.type)"
                       >
-                        {{ wordPressSetupOpen ? t('common.close') : account.loggedIn ? t('commandPalette.group.settings') : t('common.login') }}
+                        {{ selfHostedSetup === account.type ? t('common.close') : isSignedInAccount(account) ? t('commandPalette.group.settings') : t('common.login') }}
                       </button>
                     </div>
                     <div
-                      v-if="wordPressSetupOpen && wordPressSetupUrl && category.accounts.some(account => account.type === 'wordpress')"
-                      id="wordpress-setup"
+                      v-if="substackSetupOpen && substackSetupUrl && category.accounts.some(account => account.type === 'substack')"
+                      id="substack-setup"
                       class="rounded-md border p-3 sm:col-span-2"
                     >
                       <iframe
-                        id="wordpress-setup-frame"
-                        :src="wordPressSetupUrl.href"
-                        title="WordPress"
+                        id="substack-setup-frame"
+                        :src="substackSetupUrl.href"
+                        title="Substack"
                         referrerpolicy="no-referrer"
                         class="block w-full rounded-md border-0"
-                        :style="{ height: `${wordPressFormHeight}px` }"
-                        @load="initializeWordPressFrame"
+                        :style="{ height: `${substackFormHeight}px` }"
+                        @load="initializeSubstackFrame"
+                      />
+                    </div>
+                    <div
+                      v-if="selfHostedSetupUrl && category.accounts.some(account => account.type === selfHostedSetup)"
+                      id="self-hosted-setup"
+                      class="rounded-md border p-3 sm:col-span-2"
+                    >
+                      <iframe
+                        id="self-hosted-setup-frame"
+                        :key="selfHostedSetupUrl.href"
+                        :src="selfHostedSetupUrl.href"
+                        :title="selfHostedSetup === 'halo' ? 'Halo' : 'WordPress'"
+                        referrerpolicy="no-referrer"
+                        class="block w-full rounded-md border-0"
+                        :style="{ height: `${selfHostedFormHeight}px` }"
+                        @load="initializeSelfHostedFrame"
                       />
                     </div>
                     <div
